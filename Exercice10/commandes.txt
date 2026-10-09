@@ -1,0 +1,27 @@
+Exercice 10 - Docker Compose : variables d'environnement et volumes (Notes Manager)
+
+Fichiers crees: Dockerfile (build multi-etapes Java 17), .env, docker-compose.yml, .dockerignore
+Le projet Spring Boot (src/, pom.xml, init-db/) vient du sujet, non modifie.
+
+Services: db (postgres:16) et app (Spring Boot, port 8080), volumes nommes pg_data et uploads.
+
+Variables d'environnement - 3 methodes dans docker-compose.yml:
+  1. depuis .env            : APP_NAME: ${APP_NAME}
+  2. valeur en dur          : APP_ENV: production
+  3. valeur par defaut      : LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+Volumes:
+  pg_data -> /var/lib/postgresql/data (donnees PostgreSQL)
+  uploads -> /app/uploads             (fichiers uploades)
+  ./init-db -> /docker-entrypoint-initdb.d (script SQL, execute seulement si la base est vide)
+
+Resultats des tests:
+  1. docker compose up -d --build            -> db (healthy) et app Up
+  2. GET /api/info/env                        -> variables injectees (APP_NAME=Notes Manager, APP_ENV=production, DB_HOST=db...)
+  3. POST /api/notes "Test persistance"       -> note creee (id 4) + fichier uploade
+  4. docker compose down puis up -d           -> note et fichier toujours presents (volumes conserves)
+  5. docker compose down --volumes puis up -d -> note et fichier disparus, seules les 3 notes du script init restent
+  6. APP_NAME modifie dans .env + docker compose up -d --force-recreate app
+                                              -> /api/info/app renvoie "Mon Application Modifiée"
+
+Arret: docker compose down   (--volumes pour supprimer aussi les donnees)
