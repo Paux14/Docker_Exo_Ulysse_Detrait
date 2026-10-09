@@ -1,0 +1,15 @@
+Exercice 7 - Image MySQL personnalisee (kennelDB)
+
+Fichiers:
+  init.sql   : cree la base kennelDB (clients, adresses, clients_adresses, chiens, chats) et insere des donnees
+  Dockerfile : FROM mysql:8 + COPY init.sql /docker-entrypoint-initdb.d/
+
+Commandes:
+  docker build -t kennel-mysql .
+  docker run -d --name kennel-db -e MYSQL_ROOT_PASSWORD=rootpass kennel-mysql
+  docker exec -it kennel-db mysql -uroot -prootpass kennelDB
+
+Principe: l'image officielle mysql execute au premier demarrage (base vide) tous les scripts .sql
+presents dans /docker-entrypoint-initdb.d/. Les donnees sont donc deja la au lancement.
+
+Verification: 5 tables; 4 clients, 4 adresses, 5 associations, 3 chiens, 3 chats.
