@@ -1,0 +1,51 @@
+services:
+  db:
+    image: mysql:8
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: dogsdb
+      MYSQL_USER: dogs
+      MYSQL_PASSWORD: dogspass
+    ports:
+      - "3307:3306"   # port forwarding pour le développement local
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-udogs", "-pdogspass"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  logs-api:
+    build: ./logs-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:mysql://db:3306/logsdb
+      DB_USER: dogs
+      DB_PASSWORD: dogspass
+    ports:
+      - "8082:8080"
+
+  crud-api:
+    build: ./crud-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      logs-api:
+        condition: service_started
+    environment:
+      DB_URL: jdbc:mysql://db:3306/dogsdb
+      DB_USER: dogs
+      DB_PASSWORD: dogspass
+      LOGS_API_URL: http://logs-api:8080/api/v1/logs
+    ports:
+      - "8083:8080"
+
+volumes:
+  mysql-data:

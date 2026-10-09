@@ -1,0 +1,20 @@
+Exercice 9 - API CRUD (chiens) + API Logs + MySQL
+
+Architecture (3 conteneurs sur le reseau compose):
+  db        MySQL 8, bases dogsdb et logsdb (logsdb creee par init.sql), volume mysql-data, port 3307 -> 3306
+  logs-api  Spring Boot, GET/POST /api/v1/logs, stocke en base logsdb          -> http://localhost:8082
+  crud-api  Spring Boot, CRUD /api/v1/dogs, envoie ses logs a logs-api         -> http://localhost:8083
+
+Lancement: docker compose up -d --build        Arret: docker compose down (-v supprime aussi les donnees)
+
+Fonctionnement des logs:
+  Un filtre (RequestLoggingFilter) intercepte chaque appel /api/... du CRUD et envoie un log a l'API Logs
+  via RestTemplate (LogClient), vers http://logs-api:8080/api/v1/logs (nom du service resolu par le DNS Docker).
+  Niveau: INFO (2xx/3xx), WARN (4xx), ERR (5xx ou exception). Source: "[CrudAPI] GET /api/v1/dogs/9999".
+  Si l'API Logs est arretee, le CRUD continue de repondre (l'erreur d'envoi est ignoree).
+
+Tests realises:
+  GET /dogs -> INFO "HTTP 200 OK"            POST /dogs -> INFO "HTTP 201 Created"
+  GET /dogs/9999 -> WARN "HTTP 404 Not Found"   POST invalide -> WARN "HTTP 400 Bad Request"
+  DELETE /dogs/1 -> INFO "HTTP 204 No Content"
+  POST /logs avec level inconnu -> 400 ; logs persistes dans MySQL (table logs).
