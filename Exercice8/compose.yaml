@@ -1,0 +1,34 @@
+services:
+  db:
+    image: mysql:8
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: dogsdb
+      MYSQL_USER: dogs
+      MYSQL_PASSWORD: dogspass
+    ports:
+      - "3306:3306"   # port forwarding : base accessible depuis l'hôte (développement local)
+    volumes:
+      - dogs-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-udogs", "-pdogspass"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy   # l'API démarre quand MySQL est réellement prêt
+    environment:
+      DB_URL: jdbc:mysql://db:3306/dogsdb   # "db" = nom du service, résolu par le DNS Docker
+      DB_USER: dogs
+      DB_PASSWORD: dogspass
+    ports:
+      - "8081:8080"
+
+volumes:
+  dogs-data:

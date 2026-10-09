@@ -1,0 +1,18 @@
+Exercice 8 - API Spring Boot (CRUD chiens) + MySQL
+
+Stack: Java 21, Spring Boot 3.5, Spring Data JPA / Hibernate, driver mysql-connector-j, MySQL 8.
+
+Lancement (tout en Docker, aucun Java/Maven requis en local):
+  docker compose up -d --build
+  API: http://localhost:8081/api/v1/dogs    MySQL (port forwarding): localhost:3306
+
+Dockerfile multi-etapes: etape 1 maven:3.9-eclipse-temurin-21 compile le jar,
+etape 2 eclipse-temurin:21-jre ne garde que le jar (image finale plus legere).
+
+L'API joint la base par son nom de service (jdbc:mysql://db:3306/dogsdb), via le DNS interne de Docker.
+compose attend que MySQL soit "healthy" avant de demarrer l'API.
+
+Endpoints testes: GET liste, GET /{id}, POST (201), PUT /{id}, DELETE (204),
+404 sur id inconnu, 400 sur donnees invalides.
+
+Arret: docker compose down   (ajouter -v pour supprimer aussi les donnees)

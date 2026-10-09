@@ -1,0 +1,4 @@
+com\example\dogs\Dog.class
+com\example\dogs\DogController.class
+com\example\dogs\DogsApplication.class
+com\example\dogs\DogRepository.class
