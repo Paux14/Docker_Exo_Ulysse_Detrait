@@ -1,0 +1,12 @@
+Exercice 4 - Commandes utilisees
+
+docker network create mon-reseau
+docker run -it --name conteneur1 --network mon-reseau ubuntu
+  (dans le conteneur) apt update && apt install -y iputils-ping
+docker commit conteneur1 ubuntu-ping
+docker run -it --name conteneur2 --network mon-reseau ubuntu-ping
+docker network inspect mon-reseau
+
+Tests de resolution DNS interne:
+docker exec conteneur2 ping -c 3 conteneur1   -> 172.24.0.2, 0% perte
+docker exec conteneur1 ping -c 3 conteneur2   -> 172.24.0.3, 0% perte
