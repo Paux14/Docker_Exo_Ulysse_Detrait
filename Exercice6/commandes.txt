@@ -1,0 +1,12 @@
+Exercice 6 - Conteneur de dev NGINX avec volume
+
+Dossier du site (a editer sur l'ordinateur): Exercice6/site
+Lancement (depuis la racine du repo, PowerShell):
+  docker run -d --name dev-nginx -p 8080:80 -v "${PWD}\Exercice6\site:/usr/share/nginx/html:ro" nginx
+
+Le dossier local est monte (bind mount) dans /usr/share/nginx/html, le dossier servi par NGINX.
+Toute modification de index.html est visible apres rechargement du navigateur
+sur http://localhost:8080, sans redemarrer le conteneur ni installer quoi que ce soit en local.
+
+Test realise: Version 1 -> modification locale -> Version 2 visible sans redemarrage.
+:ro rend le volume en lecture seule cote conteneur (le code reste modifiable depuis l'ordinateur).
