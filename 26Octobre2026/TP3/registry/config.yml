@@ -1,0 +1,19 @@
+version: 0.1
+log:
+  level: info
+storage:
+  filesystem:
+    rootdirectory: /var/lib/registry
+  delete:
+    enabled: true
+  cache:
+    blobdescriptor: inmemory
+http:
+  addr: :5000
+  tls:
+    certificate: /certs/server.crt
+    key: /certs/server.key
+auth:
+  htpasswd:
+    realm: Shop SAS Registry
+    path: /auth/htpasswd

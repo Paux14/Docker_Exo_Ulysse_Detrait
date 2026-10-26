@@ -1,0 +1,3 @@
+registry/certs/*.key
+registry/certs/*.srl
+security/cosign.key
