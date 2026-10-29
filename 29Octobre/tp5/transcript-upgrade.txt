@@ -1,0 +1,16 @@
+$ # tag 16 sur le volume PG14
+ Container shopdata-db-1  Stopped
+2026-10-29 11:26:26.901 UTC [1] FATAL:  database files are incompatible with server
+2026-10-29 11:26:26.901 UTC [1] DETAIL:  The data directory was initialized by PostgreSQL version 14, which is not compatible with this version 16.4.
+ Container shopdata-db-1  Healthy
+$ ./upgrade-pg.sh
+checksum avant : 100000 abe29faf61ff5de58cf8e2e5eee731f7
+16.4
+checksum après : 100000 abe29faf61ff5de58cf8e2e5eee731f7
+durée : 16s
+VERDICT : OK, aucune perte
+$ volumes
+shopdata_pgdata
+shopdata_pgdata16
+$ ./upgrade-pg.sh rollback
+retour sur PostgreSQL 14, checksum : 100000 abe29faf61ff5de58cf8e2e5eee731f7

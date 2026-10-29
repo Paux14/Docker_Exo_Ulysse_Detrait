@@ -1,0 +1,29 @@
+$ docker compose up -d --wait
+ Container shopdata-db-1  Healthy
+$ ./seed.sh
+--------+----------------------------------
+ 100000 | abe29faf61ff5de58cf8e2e5eee731f7
+(1 row)
+
+$ ./backup.sh --raw
+dump logique : /c/Users/Ulysse/Downloads/Exo_Docker_/Docker_Exo_Ulysse_Detrait/29Octobre/tp5/backups/shop-20261029-122541.dump
+sauvegarde brute : /c/Users/Ulysse/Downloads/Exo_Docker_/Docker_Exo_Ulysse_Detrait/29Octobre/tp5/backups/pgdata-20261029-122541.tgz
+total 15M
+-rw-r--r-- 1 Ulysse 197121  13M Oct 29 12:25 pgdata-20261029-122541.tgz
+-rw-r--r-- 1 Ulysse 197121 1.6M Oct 29 12:25 shop-20261029-122541.dump
+$ docker compose down -v
+ Volume shopdata_pgdata  Removing
+ Volume shopdata_pgdata  Removed
+ Network shopdata_default  Removed
+(volume detruit)
+$ docker compose up -d --wait   (base vide)
+ Container shopdata-db-1  Healthy
+tables presentes: 0
+$ ./restore.sh
+restauration depuis /c/Users/Ulysse/Downloads/Exo_Docker_/Docker_Exo_Ulysse_Detrait/29Octobre/tp5/backups/shop-20261029-122541.dump
+ Container shopdata-db-1  Running
+ Container shopdata-db-1  Waiting
+ Container shopdata-db-1  Healthy
+DROP DATABASE
+CREATE DATABASE
+checksum après restauration : 100000 abe29faf61ff5de58cf8e2e5eee731f7

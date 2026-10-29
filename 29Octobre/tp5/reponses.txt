@@ -1,0 +1,80 @@
+Etape 1 - anatomie du stockage
+
+Couche d'écriture vs volume
+  docker inspect montre un seul mount : volume shopdata_pgdata -> /var/lib/postgresql/data
+  (source /var/lib/docker/volumes/shopdata_pgdata/_data).
+  docker exec db touch /tmp/x puis docker diff donne "A /tmp/x" (et /run/postgresql) : ça vit dans la
+  couche d'écriture du conteneur et disparaît avec lui. Les fichiers de la base n'apparaissent pas
+  dans le diff, ils sont dans le volume.
+
+Ce qui arrive à pgdata (testé)
+  docker compose down      : conteneur et réseau supprimés, volume gardé. Checksum identique après un up.
+  docker compose rm -sf db : conteneur supprimé, volume gardé.
+  docker volume prune      : ne supprime que les volumes sans conteneur. Avec le conteneur en marche ou
+                             juste arrêté : 0B récupéré. Après rm du conteneur : volume supprimé (77 Mo).
+                             (sur Docker 28 il faut -a pour viser les volumes nommés)
+  docker compose down -v   : volume supprimé, base perdue (c'est l'incident de Shop SAS).
+
+Volume anonyme (postgres:16-alpine sans -v)
+  L'image déclare VOLUME /var/lib/postgresql/data, donc Docker crée un volume au nom de hash.
+  docker rm -f : le volume reste (orphelin, invisible, il s'accumule).
+  docker rm -f -v : le volume est supprimé.
+  Piège : on croit avoir "supprimé" la base alors que les données traînent, ou à l'inverse on
+  perd des données parce qu'on ne sait pas retrouver le volume sous son nom hash.
+
+Bind mount / volume nommé / tmpfs
+  Volume nommé : données de prod (base), géré par Docker, portable, bonnes perfs.
+  Bind mount : code source en dev, config, dossier de sauvegardes qu'on veut voir sur l'hôte.
+               Sur Docker Desktop (Windows/macOS) il passe par la VM et le partage de fichiers :
+               nettement plus lent, et les droits peuvent poser problème.
+  tmpfs : en RAM, pour des données temporaires ou sensibles (/tmp en prod read_only).
+
+init.sql non rejoué
+  L'entrypoint postgres ne lance /docker-entrypoint-initdb.d que si le répertoire de données est vide
+  (pas de PG_VERSION). Pour forcer : supprimer le volume (down -v) et redémarrer, ou jouer le script
+  à la main avec psql.
+
+
+Etape 2 - sauvegarde / restauration
+
+  backup.sh : pg_dump -Fc horodaté via docker compose exec, option --raw pour une copie tar du volume
+  avec un conteneur alpine (volume monté en :ro), rétention des 7 derniers (KEEP).
+  La sauvegarde brute est incohérente si PostgreSQL écrit pendant la copie (pages et WAL pas au même
+  instant). Le script arrête donc la base pendant le tar. Sans arrêt : pg_backup_start / pg_backup_stop
+  avec les WAL, ou pg_basebackup.
+  restore.sh : recrée la base shop puis pg_restore.
+  Preuve dans transcript-restore.txt : checksum avant abe29faf61ff5de58cf8e2e5eee731f7 (100000 lignes),
+  down -v, base vide (0 table), restore, checksum après identique.
+  Sidecar planifié : compose.backup.yml, à superposer à la stack du TP04
+  (docker compose -f compose.yml -f ../tp5/compose.backup.yml up -d db backup).
+  Avec SCHEDULE "@every 1m" un dump apparaît chaque minute dans /backups/last
+  (transcript-sidecar.txt).
+
+
+Etape 3 - PostgreSQL 14 -> 16
+
+  Changer le tag seulement : "FATAL: database files are incompatible with server - The data directory
+  was initialized by PostgreSQL version 14, which is not compatible with this version 16.4."
+  Le format des fichiers change entre versions majeures, d'où dump/restore ou pg_upgrade.
+  upgrade-pg.sh : checksum avant, pg_dumpall + pg_dump -Fc, arrêt de PG14 (volume pgdata conservé),
+  PG16 sur le nouveau volume pgdata16, pg_restore, checksum après, verdict.
+  Résultat (transcript-upgrade.txt) : 100000 lignes, même checksum, 16 s, VERDICT OK.
+  Retour arrière : ./upgrade-pg.sh rollback (stoppe PG16, relance PG14 sur l'ancien volume, intact).
+  Testé : checksum identique.
+
+  pg_dumpall / pg_dump : pg_dump sauvegarde une seule base ; pg_dumpall toutes les bases plus les
+  objets globaux (rôles, tablespaces).
+  Nouveau volume plutôt qu'écraser : l'ancien reste un retour arrière immédiat.
+  Réduire l'indisponibilité : pg_upgrade --link (pas de copie des données, quelques secondes) avec une
+  image contenant les deux jeux de binaires (tianon/postgres-upgrade), ou réplication logique PG14 ->
+  PG16 puis bascule.
+
+
+Etape 4 - Redis
+
+  --save 60 1 : snapshot RDB si au moins une écriture en 60 s. Perte possible : jusqu'à ~60 s d'écritures
+  (et plus si le snapshot est long).
+  --appendonly yes : journal des écritures, fsync chaque seconde par défaut. Perte max ~1 s.
+  Dans la stack : cache des produits (30 s de TTL, reconstructible) et la file orders:queue (des
+  commandes en attente, perdues si Redis tombe). Le cache n'a pas besoin de persistance, la file si :
+  appendonly yes (ce qu'on a mis dans le TP04), la commande reste de toute façon en base en 'pending'.
