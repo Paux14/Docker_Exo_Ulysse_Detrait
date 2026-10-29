@@ -1,0 +1,67 @@
+services:
+  traefik:
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 128M
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+
+  db:
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 512M
+    security_opt:
+      - no-new-privileges:true
+
+  redis:
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+    user: "999:999"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+
+  api:
+    build: !reset null
+    image: ${REGISTRY:?REGISTRY doit être défini}/shop-api:${VERSION:?VERSION doit être défini}
+    ports: !reset []
+    volumes: !reset []
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+
+  worker:
+    build: !reset null
+    image: ${REGISTRY:?REGISTRY doit être défini}/shop-worker:${VERSION:?VERSION doit être défini}
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true

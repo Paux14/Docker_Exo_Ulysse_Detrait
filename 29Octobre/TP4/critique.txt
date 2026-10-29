@@ -1,0 +1,17 @@
+Problèmes du docker-compose.yml de départ
+
+1. "version: '3'" est obsolète, Compose l'ignore et le signale en warning.
+2. "links" est un vestige : les services d'un même réseau se résolvent déjà par leur nom.
+3. Images non épinglées (postgres, redis) : on récupère "latest", donc un build pas reproductible.
+4. Postgres (5432) et Redis (6379) publiés sur l'hôte : accessibles depuis tout le réseau.
+5. Mot de passe postgres/postgres en clair dans le fichier versionné, et recopié dans DATABASE_URL.
+6. "sleep 10" dans la commande de l'api : on espère que la base est prête, sans le vérifier.
+7. Aucun healthcheck, et pas de depends_on : l'ordre de démarrage n'est pas garanti.
+8. Un seul réseau par défaut : le front et la base se voient, aucune isolation.
+9. Aucun volume nommé : les données de postgres partent avec le conteneur.
+10. Pas d'init de la base : ni tables ni données.
+11. "restart: always" sur le worker seulement, rien sur les autres : incohérent.
+12. Aucune limite CPU/mémoire, aucune rotation des logs : un service peut manger la machine.
+13. Port 3000 publié en direct sur l'api : pas de reverse proxy, impossible de scaler à plusieurs réplicas.
+14. Pas de nom de projet : il dépend du nom du dossier.
+15. Une seule configuration pour dev et prod, avec build au lieu d'images de registre.
