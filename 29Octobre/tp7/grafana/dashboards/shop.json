@@ -1,0 +1,49 @@
+{
+  "uid": "shop-overview",
+  "title": "Shop SAS",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-15m", "to": "now" },
+  "panels": [
+    {
+      "id": 1, "type": "timeseries", "title": "Requetes par statut",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum(rate(http_request_duration_seconds_count[1m])) by (status)", "legendFormat": "{{status}}" }]
+    },
+    {
+      "id": 2, "type": "timeseries", "title": "Latence p95",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [{ "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[1m])) by (le))", "legendFormat": "p95" }]
+    },
+    {
+      "id": 3, "type": "timeseries", "title": "CPU par service",
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percentunit" }, "overrides": [] },
+      "targets": [{ "expr": "sum(rate(container_cpu_usage_seconds_total{container_label_com_docker_compose_project=\"shop\"}[1m])) by (container_label_com_docker_compose_service)", "legendFormat": "{{container_label_com_docker_compose_service}}" }]
+    },
+    {
+      "id": 4, "type": "timeseries", "title": "Memoire par service",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
+      "targets": [{ "expr": "sum(container_memory_working_set_bytes{container_label_com_docker_compose_project=\"shop\"}) by (container_label_com_docker_compose_service)", "legendFormat": "{{container_label_com_docker_compose_service}}" }]
+    },
+    {
+      "id": 5, "type": "logs", "title": "Logs API",
+      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 9 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{ "expr": "{service=\"api\"}" }]
+    },
+    {
+      "id": 6, "type": "logs", "title": "Erreurs",
+      "gridPos": { "x": 12, "y": 16, "w": 12, "h": 9 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{ "expr": "{project=\"shop\"} | json | level=~\"50|error|ERROR\"" }]
+    }
+  ]
+}

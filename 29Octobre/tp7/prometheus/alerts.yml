@@ -1,0 +1,41 @@
+groups:
+  - name: shop
+    rules:
+      - alert: ApiDown
+        expr: up{job="api"} == 0 or absent(up{job="api"})
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "API injoignable ({{ $labels.instance }})"
+
+      - alert: ApiHigh5xx
+        expr: sum(rate(http_request_duration_seconds_count{status=~"5.."}[1m])) / sum(rate(http_request_duration_seconds_count[1m])) > 0.05
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Plus de 5% de reponses 5xx"
+
+      - alert: ApiSlowP95
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[1m])) by (le)) > 0.5
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "p95 superieur a 500 ms"
+
+      - alert: ContainerRestarting
+        expr: changes(container_start_time_seconds{container_label_com_docker_compose_project="shop"}[5m]) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "Conteneur redemarre ({{ $labels.container_label_com_docker_compose_service }})"
+
+      - alert: ContainerMemoryHigh
+        expr: container_memory_working_set_bytes{container_label_com_docker_compose_project="shop"} / (container_spec_memory_limit_bytes{container_label_com_docker_compose_project="shop"} > 0) > 0.9
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Memoire superieure a 90% de la limite ({{ $labels.container_label_com_docker_compose_service }})"
