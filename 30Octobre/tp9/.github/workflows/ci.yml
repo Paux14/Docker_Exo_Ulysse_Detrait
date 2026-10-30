@@ -1,0 +1,172 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+env:
+  REGISTRY: ghcr.io
+  STACK_DIR: 29Octobre/TP4
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: ${{ env.STACK_DIR }}/apps/shopapi/Dockerfile
+      - uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: ${{ env.STACK_DIR }}/apps/shop-worker/Dockerfile
+      - name: compose config
+        working-directory: ${{ env.STACK_DIR }}
+        run: |
+          docker compose -f compose.yml config -q
+          REGISTRY=x VERSION=x docker compose -f compose.yml -f compose.prod.yml config -q
+
+  build:
+    needs: lint
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: shop-api
+            context: 29Octobre/TP4/apps/shopapi
+          - name: shop-worker
+            context: 29Octobre/TP4/apps/shop-worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        if: github.event_name != 'pull_request'
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.name }}
+          tags: |
+            type=sha,format=long,prefix=sha-
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}},enable=${{ !startsWith(github.ref, 'refs/tags/v0.') }}
+      - name: tests
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          target: test
+          push: false
+          secret-files: |
+            pipconf=${{ matrix.context }}/pip.conf
+          cache-from: type=gha,scope=${{ matrix.name }}
+      - name: build local pour scan
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          load: true
+          tags: scan/${{ matrix.name }}:ci
+          secret-files: |
+            pipconf=${{ matrix.context }}/pip.conf
+          cache-from: type=gha,scope=${{ matrix.name }}
+      - name: trivy
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: scan/${{ matrix.name }}:ci
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: build multi-arch et push
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: true
+          sbom: true
+          secret-files: |
+            pipconf=${{ matrix.context }}/pip.conf
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+      - uses: sigstore/cosign-installer@v3.7.0
+        if: github.event_name != 'pull_request'
+      - name: signature keyless
+        if: github.event_name != 'pull_request'
+        run: cosign sign --yes ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.name }}@${{ steps.push.outputs.digest }}
+
+  deploy-preprod:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-24.04
+    environment: preprod
+    steps:
+      - uses: actions/checkout@v4
+      - uses: sigstore/cosign-installer@v3.7.0
+      - name: verification des signatures
+        run: |
+          for img in shop-api shop-worker; do
+            cosign verify \
+              --certificate-identity-regexp "https://github.com/${{ github.repository }}/.*" \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+              ${{ env.REGISTRY }}/${{ github.repository_owner }}/$img:sha-${{ github.sha }}
+          done
+      - name: contexte docker
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ vars.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+          docker context create preprod --docker "host=ssh://deploy@${{ vars.DEPLOY_HOST }}"
+      - name: rolling update
+        env:
+          DOCKER_CONTEXT: preprod
+          REGISTRY: ${{ env.REGISTRY }}/${{ github.repository_owner }}
+          VERSION: sha-${{ github.sha }}
+        run: ./30Octobre/tp9/deploy/rolling-update.sh
+
+  deploy-prod:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: sigstore/cosign-installer@v3.7.0
+      - name: verification des signatures
+        run: |
+          for img in shop-api shop-worker; do
+            cosign verify \
+              --certificate-identity-regexp "https://github.com/${{ github.repository }}/.*" \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+              ${{ env.REGISTRY }}/${{ github.repository_owner }}/$img:${{ github.ref_name }}
+          done
+      - name: contexte docker
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ vars.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+          docker context create prod --docker "host=ssh://deploy@${{ vars.DEPLOY_HOST }}"
+      - name: rolling update
+        env:
+          DOCKER_CONTEXT: prod
+          REGISTRY: ${{ env.REGISTRY }}/${{ github.repository_owner }}
+          VERSION: ${{ github.ref_name }}
+        run: ./30Octobre/tp9/deploy/rolling-update.sh

@@ -1,0 +1,29 @@
+services:
+  traefik:
+    command: !override
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=shop_front
+      - --providers.providersThrottleDuration=200ms
+      - --serversTransport.forwardingTimeouts.dialTimeout=200ms
+      - --entrypoints.web.address=:80
+      - --ping=true
+
+  api:
+    image: ${REGISTRY:-local}/shop-api:${VERSION:-local}
+    build:
+      context: ./apps/shopapi
+    stop_grace_period: 15s
+    deploy:
+      replicas: 2
+    healthcheck:
+      interval: 2s
+      timeout: 2s
+      retries: 5
+      start_period: 5s
+    labels:
+      - traefik.http.services.api.loadbalancer.healthcheck.interval=2s
+      - traefik.http.services.api.loadbalancer.healthcheck.timeout=1s
+      - traefik.http.middlewares.api-retry.retry.attempts=5
+      - traefik.http.middlewares.api-retry.retry.initialinterval=50ms
+      - traefik.http.routers.api.middlewares=api-retry
