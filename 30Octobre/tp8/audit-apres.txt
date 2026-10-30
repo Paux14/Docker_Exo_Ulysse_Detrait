@@ -1,0 +1,8 @@
+CONTENEUR              USER       PRIV  ROOTFS   MEM    PIDS      NONEWP SOCK  
+shop-socket-proxy-1    root       false false    64M    50        yes    1     
+shop-worker-1          worker     false true     256M   100       yes    0     
+shop-api-1             1000:1000  false true     256M   100       yes    0     
+shop-db-1              70:70      false true     512M   200       yes    0     
+shop-traefik-1         65532:65532 false true     128M   100       yes    0     
+shop-redis-1           999:999    false true     256M   50        yes    0     
+conteneurs en ecart: 0

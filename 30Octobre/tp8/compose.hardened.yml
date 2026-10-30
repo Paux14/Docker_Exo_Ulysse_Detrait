@@ -1,0 +1,90 @@
+services:
+  socket-proxy:
+    image: tecnativa/docker-socket-proxy:0.2.0
+    environment:
+      CONTAINERS: 1
+      POST: 0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [proxy]
+    labels:
+      audit.socket-proxy: "true"
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 50
+    mem_limit: 64m
+    cpus: 0.25
+    restart: unless-stopped
+
+  traefik:
+    user: "65532:65532"
+    command: !override
+      - --providers.docker=true
+      - --providers.docker.endpoint=tcp://socket-proxy:2375
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=shop_front
+      - --entrypoints.web.address=:80
+      - --ping=true
+    volumes: !override []
+    networks: !override [front, proxy]
+    depends_on:
+      - socket-proxy
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 100
+    mem_limit: 128m
+    cpus: 0.5
+
+  db:
+    user: "70:70"
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run/postgresql
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 200
+    mem_limit: 512m
+    cpus: 1.0
+
+  redis:
+    user: "999:999"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 50
+    mem_limit: 256m
+    cpus: 0.5
+
+  api:
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 100
+    mem_limit: 256m
+    cpus: 0.5
+
+  worker:
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 100
+    mem_limit: 256m
+    cpus: 0.5
+
+networks:
+  proxy:
+    internal: true

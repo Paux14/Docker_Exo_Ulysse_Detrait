@@ -1,0 +1,12 @@
+CONTENEUR              USER       PRIV  ROOTFS   MEM    PIDS      NONEWP SOCK  
+shop-api-1             1000:1000  false false    0M     0         no     0     
+  ECART [shop-api-1]: cap-drop-ALL-absent rootfs-rw no-mem-limit no-pids-limit no-new-privileges-absent
+shop-worker-1          worker     false false    0M     0         no     0     
+  ECART [shop-worker-1]: cap-drop-ALL-absent rootfs-rw no-mem-limit no-pids-limit no-new-privileges-absent
+shop-db-1              root       false false    0M     0         no     0     
+  ECART [shop-db-1]: user-root cap-drop-ALL-absent rootfs-rw no-mem-limit no-pids-limit no-new-privileges-absent
+shop-traefik-1         root       false false    0M     0         no     1     
+  ECART [shop-traefik-1]: user-root cap-drop-ALL-absent rootfs-rw no-mem-limit no-pids-limit no-new-privileges-absent docker-sock
+shop-redis-1           root       false false    0M     0         no     0     
+  ECART [shop-redis-1]: user-root cap-drop-ALL-absent rootfs-rw no-mem-limit no-pids-limit no-new-privileges-absent
+conteneurs en ecart: 5
